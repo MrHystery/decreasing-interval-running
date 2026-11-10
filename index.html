@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1419">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<title>Fractionné dégressif</title>
+<style>
+:root{--bg:#0f1419;--card:#1a222c;--line:#2a3542;--txt:#eef2f6;--mut:#8b9aab;--warm:#4da3ff;--work:#ff5a3c;--rest:#3ddc97;--done:#ffc83d}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom);transition:background .3s}
+body[data-phase=warm],body[data-phase=cool]{--ac:var(--warm)}
+body[data-phase=work]{--ac:var(--work)}
+body[data-phase=rest]{--ac:var(--rest)}
+body[data-phase=done]{--ac:var(--done)}
+body[data-phase=work]{background:#2a1410}
+body[data-phase=rest]{background:#0f2219}
+body[data-phase=warm],body[data-phase=cool]{background:#0e1d2e}
+body[data-phase=done]{background:#2a2410}
+.screen{display:none;max-width:480px;margin:0 auto;min-height:100%;padding:16px 0 24px}
+.screen.on{display:flex;flex-direction:column}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+h1{font-size:1.3rem;margin:0}
+.btn{border:0;border-radius:14px;padding:14px 18px;font-size:1rem;font-weight:600;color:#fff;background:#2a3542;cursor:pointer}
+.btn.primary{background:var(--work);font-size:1.2rem;padding:18px;width:100%}
+.btn.small{padding:8px 12px;font-size:.85rem;border-radius:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+.card h2{font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:0 0 10px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{display:flex;flex-direction:column;font-size:.78rem;color:var(--mut);gap:4px}
+input[type=number]{width:100%;padding:11px;font-size:1.1rem;color:var(--txt);background:#0f1419;border:1px solid var(--line);border-radius:10px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{padding:7px 12px;border-radius:999px;background:#0f1419;border:1px solid var(--line);color:var(--txt);font-size:.85rem}
+.toggles{display:flex;gap:16px;flex-wrap:wrap}
+.toggles label{flex-direction:row;align-items:center;gap:8px;color:var(--txt);font-size:.95rem}
+.plan{display:flex;flex-wrap:wrap;gap:6px}
+.pill{padding:5px 9px;border-radius:8px;font-size:.8rem;font-weight:600;color:#0f1419}
+.pill.warm,.pill.cool{background:var(--warm)}.pill.work{background:var(--work);color:#fff}.pill.rest{background:var(--rest)}
+.total{margin-top:10px;color:var(--mut);font-size:.9rem}
+.spacer{flex:1}
+/* run */
+#run{text-align:center;justify-content:space-between}
+.phase{font-size:1.6rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--ac);margin-top:20px}
+.sub{color:var(--mut);margin-top:4px}
+.time{font-size:min(30vw,8.5rem);font-weight:800;font-variant-numeric:tabular-nums;line-height:1;margin:18px 0;color:var(--ac)}
+.bar{height:10px;background:#ffffff1f;border-radius:6px;overflow:hidden}
+.bar>i{display:block;height:100%;width:0;background:var(--ac);transition:width .25s linear}
+.next{margin:16px 0;color:var(--mut)}
+.next b{color:var(--txt)}
+.ctrl{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.ctrl .btn{padding:18px 6px}
+.stop{background:#5a2330!important}
+#done{align-items:center;justify-content:center;text-align:center;gap:16px}
+#done .big{font-size:4rem}
+#installBtn{display:none}
+</style>
+</head>
+<body data-phase="idle">
+
+<!-- Réglages -->
+<section id="setup" class="screen on">
+  <header>
+    <h1>🏃 Fractionné dégressif</h1>
+    <button id="installBtn" class="btn small">Installer</button>
+  </header>
+
+  <div class="card">
+    <h2>Modèles</h2>
+    <div class="chips">
+      <button class="chip" data-p="5,1,1,120,30">5-4-3-2-1</button>
+      <button class="chip" data-p="3,1,0.5,90,30">3-2-1</button>
+      <button class="chip" data-p="8,2,2,150,45">8-6-4-2</button>
+      <button class="chip" data-p="4,1,0.5,90,20">4-3,5-…-1</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Efforts (durées dégressives)</h2>
+    <div class="grid">
+      <label>Premier effort (min)<input id="start" type="number" inputmode="decimal" step="0.5" min="0.5"></label>
+      <label>Dernier effort (min)<input id="end" type="number" inputmode="decimal" step="0.5" min="0.5"></label>
+      <label>Baisse par effort (min)<input id="step" type="number" inputmode="decimal" step="0.25" min="0.25"></label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Récupérations (dégressives aussi)</h2>
+    <div class="grid">
+      <label>Première récup (sec)<input id="restStart" type="number" inputmode="numeric" step="5" min="0"></label>
+      <label>Dernière récup (sec)<input id="restEnd" type="number" inputmode="numeric" step="5" min="0"></label>
+    </div>
+    <div class="total">Les récups intermédiaires sont réparties régulièrement entre la première et la dernière.</div>
+  </div>
+
+  <div class="card">
+    <h2>Échauffement / retour au calme</h2>
+    <div class="grid">
+      <label>Échauffement (min)<input id="warm" type="number" inputmode="decimal" step="1" min="0"></label>
+      <label>Retour au calme (min)<input id="cool" type="number" inputmode="decimal" step="1" min="0"></label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Alertes</h2>
+    <div class="toggles">
+      <label><input id="sound" type="checkbox"> Bips</label>
+      <label><input id="voice" type="checkbox"> Voix</label>
+      <label><input id="vibe" type="checkbox"> Vibration</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Aperçu de la séance</h2>
+    <div id="plan" class="plan"></div>
+    <div id="total" class="total"></div>
+  </div>
+
+  <div class="spacer"></div>
+  <button id="startBtn" class="btn primary">▶ Démarrer</button>
+</section>
+
+<!-- Séance -->
+<section id="run" class="screen">
+  <div>
+    <div id="phase" class="phase">—</div>
+    <div id="sub" class="sub"></div>
+  </div>
+  <div>
+    <div id="time" class="time">0:00</div>
+    <div class="bar"><i id="barPhase"></i></div>
+    <div class="next" id="next"></div>
+    <div class="bar" style="height:6px"><i id="barAll"></i></div>
+    <div class="sub" id="remain" style="margin-top:6px"></div>
+  </div>
+  <div class="ctrl">
+    <button id="pauseBtn" class="btn">⏸ Pause</button>
+    <button id="skipBtn" class="btn">⏭ Passer</button>
+    <button id="stopBtn" class="btn stop">⏹ Stop</button>
+  </div>
+</section>
+
+<!-- Fin -->
+<section id="done" class="screen">
+  <div class="big">🎉</div>
+  <h1>Séance terminée !</h1>
+  <div class="sub" id="doneInfo"></div>
+  <button id="againBtn" class="btn primary" style="max-width:320px">Retour aux réglages</button>
+</section>
+
+<script>
+(function(){
+'use strict';
+const $ = id => document.getElementById(id);
+const DEF = {start:5,end:1,step:1,restStart:120,restEnd:30,warm:10,cool:5,sound:true,voice:true,vibe:true};
+let S = loadSettings();
+
+function loadSettings(){
+  try{ return Object.assign({}, DEF, JSON.parse(localStorage.getItem('fd-settings')||'{}')); }
+  catch(e){ return Object.assign({}, DEF); }
+}
+function saveSettings(){ try{ localStorage.setItem('fd-settings', JSON.stringify(S)); }catch(e){} }
+
+const numFields = ['start','end','step','restStart','restEnd','warm','cool'];
+const boolFields = ['sound','voice','vibe'];
+
+function writeInputs(){
+  numFields.forEach(k => $(k).value = S[k]);
+  boolFields.forEach(k => $(k).checked = !!S[k]);
+}
+function readInputs(){
+  numFields.forEach(k => {
+    const v = parseFloat(String($(k).value).replace(',','.'));
+    if(!isNaN(v) && v >= 0) S[k] = v;
+  });
+  S.start = Math.max(0.5, S.start);
+  S.end = Math.max(0.5, S.end);
+  S.step = Math.max(0.25, S.step);
+  boolFields.forEach(k => S[k] = $(k).checked);
+}
+
+/* ---------- Plan ---------- */
+function buildPlan(s){
+  const works = [];
+  for(let d = s.start; d >= s.end - 1e-9; d = Math.round((d - s.step) * 1000) / 1000){
+    works.push(d);
+    if(works.length > 60) break;
+  }
+  if(!works.length) works.push(s.start);
+  const n = works.length;
+  const plan = [];
+  if(s.warm > 0) plan.push({type:'warm', label:'Échauffement', dur:Math.round(s.warm*60)});
+  works.forEach((d,i) => {
+    plan.push({type:'work', label:'Effort ' + (i+1) + '/' + n, dur:Math.round(d*60)});
+    if(i < n-1){
+      const t = (n-1) > 1 ? i / (n-2) : 0;
+      let r = s.restStart + (s.restEnd - s.restStart) * t;
+      r = Math.max(0, Math.round(r / 5) * 5);
+      if(r > 0) plan.push({type:'rest', label:'Récupération', dur:r});
+    }
+  });
+  if(s.cool > 0) plan.push({type:'cool', label:'Retour au calme', dur:Math.round(s.cool*60)});
+  return plan;
+}
+function fmt(sec){
+  sec = Math.max(0, Math.round(sec));
+  const m = Math.floor(sec/60), r = sec % 60;
+  return m + ':' + String(r).padStart(2,'0');
+}
+function spoken(sec){
+  const m = Math.floor(sec/60), r = sec % 60;
+  if(m === 0) return r + ' secondes';
+  if(r === 0) return m + (m>1 ? ' minutes' : ' minute');
+  return m + (m>1 ? ' minutes ' : ' minute ') + r;
+}
+function renderPreview(){
+  readInputs();
+  const plan = buildPlan(S);
+  $('plan').innerHTML = plan.map(p => '<span class="pill ' + p.type + '">' + fmt(p.dur) + '</span>').join('');
+  const tot = plan.reduce((a,p) => a + p.dur, 0);
+  const effort = plan.filter(p => p.type==='work').reduce((a,p) => a + p.dur, 0);
+  $('total').textContent = 'Durée totale : ' + fmt(tot) + ' (dont ' + fmt(effort) + ' d\'effort)';
+}
+
+/* ---------- Alertes ---------- */
+let ac = null;
+function initAudio(){
+  try{
+    if(!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+    if(ac.state === 'suspended') ac.resume();
+  }catch(e){}
+}
+function beep(freq, dur, delay){
+  if(!S.sound || !ac) return;
+  try{
+    const t = ac.currentTime + (delay||0);
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'sine'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.6, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(ac.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  }catch(e){}
+}
+function vibrate(p){ if(S.vibe && navigator.vibrate) try{ navigator.vibrate(p); }catch(e){} }
+function say(text){
+  if(!S.voice || !('speechSynthesis' in window)) return;
+  try{
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'fr-FR'; u.rate = 1.05;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+/* ---------- Moteur ---------- */
+let plan = [], idx = -1, endAt = 0, paused = false, remainMs = 0, timer = null, running = false;
+let lastBeepSec = null, wl = null, startedAt = 0;
+
+async function requestWake(){
+  try{ if('wakeLock' in navigator) wl = await navigator.wakeLock.request('screen'); }catch(e){}
+}
+function releaseWake(){ try{ if(wl){ wl.release(); wl = null; } }catch(e){} }
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && running && !paused) requestWake();
+});
+
+function show(id){
+  ['setup','run','done'].forEach(s => $(s).classList.toggle('on', s === id));
+}
+
+function startSession(){
+  readInputs(); saveSettings();
+  plan = buildPlan(S);
+  if(!plan.length) return;
+  initAudio();
+  running = true; paused = false; startedAt = Date.now();
+  show('run'); requestWake();
+  enter(0, Date.now());
+  clearInterval(timer);
+  timer = setInterval(tick, 200);
+}
+
+function enter(i, from){
+  idx = i;
+  const ph = plan[i];
+  endAt = from + ph.dur * 1000;
+  lastBeepSec = null;
+  document.body.dataset.phase = ph.type === 'cool' ? 'cool' : ph.type;
+  $('phase').textContent = ph.label;
+  $('sub').textContent = ph.type === 'work' ? 'Allure fractionné' : ph.type === 'rest' ? 'Trottine / marche' : 'Allure facile';
+  const nx = plan[i+1];
+  $('next').innerHTML = nx ? 'Ensuite : <b>' + nx.label + ' — ' + fmt(nx.dur) + '</b>' : 'Dernière phase';
+  beep(880, 0.25); beep(1320, 0.35, 0.3);
+  vibrate(ph.type === 'work' ? [400] : [150,80,150]);
+  say(ph.label.replace('/', ' sur ') + ', ' + spoken(ph.dur));
+  paint();
+}
+
+function remainingTotal(remCur){
+  let t = remCur;
+  for(let j = idx+1; j < plan.length; j++) t += plan[j].dur * 1000;
+  return t;
+}
+
+function paint(){
+  const rem = paused ? remainMs : Math.max(0, endAt - Date.now());
+  const ph = plan[idx];
+  $('time').textContent = fmt(Math.ceil(rem/1000));
+  $('barPhase').style.width = (100 * (1 - rem/(ph.dur*1000))) + '%';
+  const totalAll = plan.reduce((a,p) => a + p.dur*1000, 0);
+  const rt = remainingTotal(rem);
+  $('barAll').style.width = (100 * (1 - rt/totalAll)) + '%';
+  $('remain').textContent = 'Reste ' + fmt(Math.ceil(rt/1000)) + ' sur ' + fmt(totalAll/1000);
+}
+
+function tick(){
+  if(paused) return;
+  let rem = endAt - Date.now();
+  while(rem <= 0){
+    if(idx + 1 >= plan.length){ finish(); return; }
+    enter(idx + 1, endAt);
+    rem = endAt - Date.now();
+  }
+  const sec = Math.ceil(rem/1000);
+  if(sec <= 3 && sec >= 1 && sec !== lastBeepSec && plan[idx].dur > 6){
+    lastBeepSec = sec;
+    beep(660, 0.12);
+  }
+  paint();
+}
+
+function finish(){
+  clearInterval(timer); running = false; releaseWake();
+  document.body.dataset.phase = 'done';
+  beep(880,0.2); beep(880,0.2,0.3); beep(1320,0.5,0.6);
+  vibrate([300,100,300,100,600]);
+  say('Séance terminée, bravo !');
+  const effort = plan.filter(p => p.type==='work').length;
+  $('doneInfo').textContent = effort + ' efforts — ' + fmt((Date.now()-startedAt)/1000) + ' au total';
+  show('done');
+}
+
+function stopSession(){
+  clearInterval(timer); running = false; paused = false; releaseWake();
+  try{ speechSynthesis.cancel(); }catch(e){}
+  document.body.dataset.phase = 'idle';
+  show('setup');
+}
+
+$('pauseBtn').onclick = () => {
+  if(!paused){
+    paused = true; remainMs = Math.max(0, endAt - Date.now());
+    $('pauseBtn').textContent = '▶ Reprendre';
+  }else{
+    paused = false; endAt = Date.now() + remainMs;
+    $('pauseBtn').textContent = '⏸ Pause';
+    requestWake();
+  }
+  paint();
+};
+$('skipBtn').onclick = () => {
+  if(idx + 1 >= plan.length){ finish(); return; }
+  if(paused){ paused = false; $('pauseBtn').textContent = '⏸ Pause'; }
+  enter(idx + 1, Date.now());
+};
+$('stopBtn').onclick = () => { if(confirm('Arrêter la séance ?')) stopSession(); };
+$('againBtn').onclick = () => { document.body.dataset.phase = 'idle'; show('setup'); };
+$('startBtn').onclick = startSession;
+
+/* ---------- Réglages ---------- */
+numFields.concat(boolFields).forEach(k => $(k).addEventListener('input', renderPreview));
+document.querySelectorAll('.chip').forEach(c => c.onclick = () => {
+  const [a,b,st,rs,re] = c.dataset.p.split(',').map(Number);
+  $('start').value = a; $('end').value = b; $('step').value = st;
+  $('restStart').value = rs; $('restEnd').value = re;
+  renderPreview();
+});
+
+/* ---------- Installation PWA ---------- */
+let deferred = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); deferred = e; $('installBtn').style.display = 'inline-block';
+});
+$('installBtn').onclick = async () => {
+  if(!deferred) return;
+  deferred.prompt(); await deferred.userChoice; deferred = null;
+  $('installBtn').style.display = 'none';
+};
+window.addEventListener('appinstalled', () => { $('installBtn').style.display = 'none'; });
+if('serviceWorker' in navigator && /^https?:/.test(location.protocol)){
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+writeInputs();
+renderPreview();
+})();
+</script>
+</body>
+</html>
